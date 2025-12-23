@@ -71,6 +71,7 @@ class RealtimeDataCollector:
             
             return snapshot
         except Exception as e:
+            print(f"Error in collect_snapshot(): {e}")
             return None
     
     def save_snapshot(self, snapshot: dict):

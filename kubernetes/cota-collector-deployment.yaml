@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cota-collector
+  namespace: cota-collector
+  labels:
+    app: cota-collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cota-collector
+  template:
+    metadata:
+      labels:
+        app: cota-collector
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: "true"
+      dnsPolicy: "None"
+      dnsConfig:
+        nameservers:
+          - "8.8.8.8"
+          - "8.8.4.4"
+          - "1.1.1.1"
+      containers:
+      - name: collector
+        image: cota-collector:latest
+        imagePullPolicy: Never
+        env:
+        - name: SNAPSHOT_INTERVAL_MINUTES
+          value: "2"
+        - name: ALERT_INTERVAL_MINUTES
+          value: "15"
+        - name: DATA_DIR
+          value: "/data/realtime_history"
+        - name: TZ
+          value: "America/New_York"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: cota-collector-data
+

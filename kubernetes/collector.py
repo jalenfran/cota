@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """
-Data collector for COTA real-time feeds.
-Collects vehicles and delays every 2 minutes, alerts every 15 minutes.
+Simplified data collector for containerized deployment.
+Collects COTA real-time data continuously.
 """
+import os
 import sys
 import time
 import signal
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add src to path
+sys.path.insert(0, '/app/src')
 
 from src.loaders.data_collector import RealtimeDataCollector
 
@@ -24,18 +26,21 @@ signal.signal(signal.SIGTERM, signal_handler)
 
 
 if __name__ == '__main__':
-    interval = int(sys.argv[1]) if len(sys.argv) > 1 else 2
-    alert_interval = int(sys.argv[2]) if len(sys.argv) > 2 else 15
+    # Get configuration from environment variables
+    snapshot_interval = int(os.getenv('SNAPSHOT_INTERVAL_MINUTES', '2'))
+    alert_interval = int(os.getenv('ALERT_INTERVAL_MINUTES', '15'))
+    data_dir = os.getenv('DATA_DIR', '/data/realtime_history')
     
     collector = RealtimeDataCollector(
-        snapshot_interval_minutes=interval,
+        output_dir=data_dir,
+        snapshot_interval_minutes=snapshot_interval,
         alert_interval_minutes=alert_interval
     )
     
     print("=" * 60)
-    print("COTA Real-Time Data Collector")
+    print("COTA Real-Time Data Collector (Containerized)")
     print("=" * 60)
-    print(f"Snapshot interval: {interval} minutes")
+    print(f"Snapshot interval: {snapshot_interval} minutes")
     print(f"Alert collection: {alert_interval} minutes")
     print(f"Data directory: {collector.output_dir}")
     print("Press Ctrl+C to stop")
@@ -48,5 +53,7 @@ if __name__ == '__main__':
         print("\nCollection stopped by user")
     except Exception as e:
         print(f"\nError: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 

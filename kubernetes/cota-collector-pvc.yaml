@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cota-collector-data
+  namespace: cota-collector
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: pi-nas-storage
+  resources:
+    requests:
+      storage: 50Gi
+
