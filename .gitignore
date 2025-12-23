@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+.jupyter/
+
+# Data files
+data/*.pb
+data/census/
+data/*.zip
+output/
+*.csv
+*.pkl
+*.h5
+*.hdf5
+
+# Census downloads
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.xml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+.DS_Store
+
+# Models and checkpoints
+*.pth
+*.pt
+*.ckpt
+checkpoints/
+models/saved/
+
+# Reports and outputs
+*.pdf
+*.xlsx
+*.xls
+reports/
+output/
+
+# Environment
+.env
+.env.local
+*.env
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+~*
