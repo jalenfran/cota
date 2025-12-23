@@ -1,8 +1,7 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "builder": "NIXPACKS",
-    "buildCommand": "pip install -q -r requirements-collector.txt"
+    "builder": "NIXPACKS"
   },
   "deploy": {
     "startCommand": "python scripts/simple_collector.py 2",
