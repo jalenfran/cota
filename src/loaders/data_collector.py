@@ -19,12 +19,14 @@ class RealtimeDataCollector:
     def __init__(
         self,
         output_dir: Optional[str] = None,
-        snapshot_interval_minutes: int = 2
+        snapshot_interval_minutes: int = 2,
+        alert_interval_minutes: int = 15
     ):
         """
         Args:
             output_dir: Directory to store collected data (default: data/realtime_history/)
             snapshot_interval_minutes: Minutes between snapshots (recommended: 1-2 for bunching, 5 for general analysis)
+            alert_interval_minutes: Minutes between alert collections (alerts change infrequently, default 15 min)
         """
         if output_dir is None:
             current = Path(__file__).parent
@@ -34,6 +36,8 @@ class RealtimeDataCollector:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.interval_seconds = snapshot_interval_minutes * 60
+        self.alert_interval_seconds = alert_interval_minutes * 60
+        self.last_alert_collection = None
         self.rt_loader = GTFSRealtimeLoader(use_live=True)
         
     def collect_snapshot(self) -> dict:
@@ -43,7 +47,17 @@ class RealtimeDataCollector:
         try:
             vehicles = self.rt_loader.load_vehicle_positions()
             delays = compute_realtime_delays_snapshot(rt_loader=self.rt_loader)
-            alerts = self.rt_loader.load_alerts()
+            
+            should_collect_alerts = (
+                self.last_alert_collection is None or
+                (timestamp - self.last_alert_collection).total_seconds() >= self.alert_interval_seconds
+            )
+            
+            if should_collect_alerts:
+                alerts = self.rt_loader.load_alerts()
+                self.last_alert_collection = timestamp
+            else:
+                alerts = []
             
             snapshot = {
                 'timestamp': timestamp,
@@ -57,7 +71,6 @@ class RealtimeDataCollector:
             
             return snapshot
         except Exception as e:
-            print(f"Error collecting snapshot at {timestamp}: {e}")
             return None
     
     def save_snapshot(self, snapshot: dict):
@@ -100,6 +113,7 @@ class RealtimeDataCollector:
         
         print(f"Starting data collection at {start_time}")
         print(f"Snapshot interval: {self.interval_seconds / 60:.0f} minutes")
+        print(f"Alert collection interval: {self.alert_interval_seconds / 60:.0f} minutes")
         if end_time:
             print(f"Will collect until {end_time}")
         
@@ -114,9 +128,10 @@ class RealtimeDataCollector:
             if snapshot:
                 self.save_snapshot(snapshot)
                 snapshot_count += 1
+                alert_info = f", {snapshot['n_alerts']} alerts" if snapshot['n_alerts'] > 0 else ""
                 print(f"[{datetime.now()}] Snapshot {snapshot_count}: "
                       f"{snapshot['n_vehicles']} vehicles, "
-                      f"{snapshot['n_delay_updates']} delay updates")
+                      f"{snapshot['n_delay_updates']} delay updates{alert_info}")
             
             time.sleep(self.interval_seconds)
     
@@ -153,8 +168,8 @@ class RealtimeDataCollector:
                 try:
                     df = pd.read_parquet(delay_file)
                     all_delays.append(df)
-                except Exception as e:
-                    print(f"Error loading {delay_file}: {e}")
+                except Exception:
+                    pass
         
         if not all_delays:
             return pd.DataFrame()

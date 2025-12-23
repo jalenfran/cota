@@ -26,20 +26,27 @@ def main():
     parser.add_argument('--hours', type=int, default=None,
                        help='Duration in hours (None = indefinitely)')
     parser.add_argument('--interval', type=int, default=2,
-                       help='Snapshot interval in minutes (default: 2, recommended: 1-2 for bunching, 5 for general)')
+                       help='Snapshot interval in minutes (default: 2)')
+    parser.add_argument('--alert-interval', type=int, default=15,
+                       help='Alert collection interval in minutes (default: 15, alerts change infrequently)')
     
     args = parser.parse_args()
     
-    collector = RealtimeDataCollector(snapshot_interval_minutes=args.interval)
+    collector = RealtimeDataCollector(
+        snapshot_interval_minutes=args.interval,
+        alert_interval_minutes=args.alert_interval
+    )
     
     if args.hours:
         print(f"Starting {args.hours}-hour data collection...")
         print(f"Snapshot interval: {args.interval} minutes")
+        print(f"Alert interval: {args.alert_interval} minutes")
         print("Press Ctrl+C to stop early\n")
         collector.run_continuous(duration_hours=args.hours)
     else:
         print("Starting continuous data collection (indefinite)...")
         print(f"Snapshot interval: {args.interval} minutes")
+        print(f"Alert interval: {args.alert_interval} minutes")
         print("Press Ctrl+C to stop\n")
         collector.run_continuous()
 

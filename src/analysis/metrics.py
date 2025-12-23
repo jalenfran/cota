@@ -147,8 +147,8 @@ class RouteMetrics:
                     'trips_per_day': self.trips_per_day(route_id),
                     'service_span_hours': self.service_span_hours(route_id),
                 })
-            except Exception as e:
-                print(f"Error processing route {route_id}: {e}")
+            except Exception:
+                pass
                 
         return pd.DataFrame(results)
 

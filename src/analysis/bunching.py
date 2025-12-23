@@ -40,7 +40,7 @@ def detect_bunching(
     if len(route_vehicles) < 2:
         return pd.DataFrame()
     
-    from scipy.spatial.distance import cdist
+    from src.models.optimize import haversine_distance_matrix
     
     incidents = []
     
@@ -52,7 +52,10 @@ def detect_bunching(
         
         positions = snapshot[['latitude', 'longitude']].values
         
-        distances_km = cdist(positions, positions, metric='euclidean') * 111
+        distances_km = haversine_distance_matrix(
+            positions[:, 0], positions[:, 1],
+            positions[:, 0], positions[:, 1]
+        )
         
         np.fill_diagonal(distances_km, np.inf)
         

@@ -5,8 +5,31 @@ import numpy as np
 import pandas as pd
 from typing import List, Tuple, Dict, Optional
 from dataclasses import dataclass
-from scipy.spatial.distance import cdist
+from math import radians, sin, cos, sqrt, atan2
 from scipy.optimize import minimize, LinearConstraint
+
+from src.config.transit_params import get_cota_params
+
+
+def haversine_distance_matrix(lat1_arr, lon1_arr, lat2_arr, lon2_arr):
+    """
+    Calculate great-circle distances between two sets of points using haversine formula.
+    Returns distance matrix in km with shape (len(lat1_arr), len(lat2_arr)).
+    Element [i, j] is distance from point i in set 1 to point j in set 2.
+    """
+    R = 6371
+    lat1_rad = np.radians(lat1_arr)
+    lon1_rad = np.radians(lon1_arr)
+    lat2_rad = np.radians(lat2_arr)
+    lon2_rad = np.radians(lon2_arr)
+    
+    dlat = lat2_rad[np.newaxis, :] - lat1_rad[:, np.newaxis]
+    dlon = lon2_rad[np.newaxis, :] - lon1_rad[:, np.newaxis]
+    
+    a = np.sin(dlat/2)**2 + np.cos(lat1_rad[:, np.newaxis]) * np.cos(lat2_rad[np.newaxis, :]) * np.sin(dlon/2)**2
+    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1-a))
+    
+    return R * c
 
 
 @dataclass
@@ -91,14 +114,12 @@ class StopPlacementOptimizer:
         
     def calculate_coverage(self, stop_locations: np.ndarray) -> float:
         """Calculate population covered within walk distance"""
-        # Distance matrix: population points x stops
-        distances = cdist(
-            self.population_grid[['lat', 'lon']].values,
-            stop_locations,
-            metric='euclidean'
-        ) * 111  # Rough conversion to km (1 degree ≈ 111km)
+        pop_coords = self.population_grid[['lat', 'lon']].values
+        distances = haversine_distance_matrix(
+            pop_coords[:, 0], pop_coords[:, 1],
+            stop_locations[:, 0], stop_locations[:, 1]
+        )
         
-        # Population covered (within walk distance of any stop)
         covered = np.any(distances <= self.max_walk_distance, axis=1)
         return self.population_grid.loc[covered, 'population'].sum()
     
@@ -145,11 +166,11 @@ class StopPlacementOptimizer:
                 
                 coverage = self.calculate_coverage(test_stops)
                 
-                # Score: coverage / distance to existing stops (avoid clustering)
-                min_dist = np.min(cdist(
-                    [[candidate['lat'], candidate['lon']]],
-                    current_stops
-                )[0]) * 111
+                candidate_coords = np.array([[candidate['lat'], candidate['lon']]])
+                min_dist = haversine_distance_matrix(
+                    candidate_coords[:, 0], candidate_coords[:, 1],
+                    current_stops[:, 0], current_stops[:, 1]
+                )[0].min()
                 
                 score = coverage * min(min_dist / 0.5, 1.0)  # Penalty if too close
                 
@@ -160,23 +181,28 @@ class StopPlacementOptimizer:
             if best_idx is not None:
                 chosen = remaining.loc[best_idx]
                 
-                # Calculate population within 400m
-                distances = cdist(
-                    [[chosen['lat'], chosen['lon']]],
-                    self.population_grid[['lat', 'lon']].values
-                )[0] * 111
+                candidate_coords = np.array([[chosen['lat'], chosen['lon']]])
+                pop_coords = self.population_grid[['lat', 'lon']].values
+                distances = haversine_distance_matrix(
+                    candidate_coords[:, 0], candidate_coords[:, 1],
+                    pop_coords[:, 0], pop_coords[:, 1]
+                )[0]
                 
                 pop_nearby = self.population_grid.loc[
                     distances <= self.max_walk_distance, 
                     'population'
                 ].sum()
                 
-                # Estimate ridership (conservative: 2% of nearby population as daily riders)
-                est_boardings = pop_nearby * 0.02
+                params = get_cota_params()
+                ridership_rate = params['ridership_rate']
+                est_boardings = pop_nearby * ridership_rate
                 
-                # Simple ROI (assume $2 fare, 260 weekdays)
-                annual_revenue = est_boardings * 2 * 260
-                roi = ((annual_revenue - cost_per_stop * 0.1) / cost_per_stop) * 100
+                fare_per_trip = params['fare_per_trip']
+                operating_days = params['operating_days_per_year']
+                annual_maintenance = cost_per_stop * params['maintenance_cost_pct']
+                
+                annual_revenue = est_boardings * fare_per_trip * operating_days
+                roi = ((annual_revenue - annual_maintenance) / cost_per_stop) * 100
                 
                 proposal = StopProposal(
                     location=(chosen['lat'], chosen['lon']),
@@ -198,23 +224,33 @@ class StopPlacementOptimizer:
         
         return selected
     
-    def find_coverage_gaps(self, threshold_minutes: float = 10) -> pd.DataFrame:
+    def find_coverage_gaps(
+        self, 
+        threshold_minutes: float = 5,
+        prioritize_transit_dependent: bool = True,
+        transit_dependent_weight: float = 2.0
+    ) -> pd.DataFrame:
         """
-        Identify areas with poor coverage
+        Identify areas with poor coverage, prioritizing transit-dependent populations.
         
+        Args:
+            threshold_minutes: Maximum walk time threshold (default 5 min = 400m)
+            prioritize_transit_dependent: Weight zero-vehicle households higher
+            transit_dependent_weight: Multiplier for transit-dependent population
+            
         Returns:
-            DataFrame of underserved areas with lat, lon, gap_minutes
+            DataFrame of underserved areas with priority scores
         """
-        # For each population point, find distance to nearest stop
-        distances = cdist(
-            self.population_grid[['lat', 'lon']].values,
-            self.existing_stops[['lat', 'lon']].values,
-            metric='euclidean'
-        ) * 111  # Convert to km
+        pop_coords = self.population_grid[['lat', 'lon']].values
+        stop_coords = self.existing_stops[['lat', 'lon']].values
+        
+        distances = haversine_distance_matrix(
+            pop_coords[:, 0], pop_coords[:, 1],
+            stop_coords[:, 0], stop_coords[:, 1]
+        )
         
         min_distances = distances.min(axis=1)
         
-        # Assume 5 km/h walking speed
         walk_time_minutes = (min_distances / 5) * 60
         
         gaps = self.population_grid.copy()
@@ -222,7 +258,19 @@ class StopPlacementOptimizer:
         gaps['walk_time_minutes'] = walk_time_minutes
         gaps['coverage_gap'] = walk_time_minutes > threshold_minutes
         
-        return gaps[gaps['coverage_gap']].sort_values('population', ascending=False)
+        # Calculate priority score
+        if prioritize_transit_dependent and 'zero_vehicle_households' in gaps.columns:
+            gaps['transit_dependent_pop'] = gaps.get('zero_vehicle_households', 0) * 2.5
+            gaps['priority_score'] = (
+                gaps['population'] + 
+                gaps.get('transit_dependent_pop', 0) * transit_dependent_weight
+            )
+        else:
+            gaps['priority_score'] = gaps['population']
+        
+        gaps = gaps[gaps['coverage_gap']].copy()
+        
+        return gaps.sort_values('priority_score', ascending=False)
 
 
 class ScheduleOptimizer:
@@ -296,13 +344,15 @@ class ScheduleOptimizer:
                 vehicles_proposed = int(np.ceil(route_cycle_time / optimal_headway))
                 additional_vehicles = vehicles_proposed - vehicles_current
                 
+                params = get_cota_params()
+                
                 # Cost impact
                 service_hours_per_day = route.get('service_hours', 16)
                 additional_hours = (vehicles_proposed - vehicles_current) * service_hours_per_day
-                annual_cost = additional_hours * 260 * self.cost_per_hour
+                annual_cost = additional_hours * params['operating_days_per_year'] * self.cost_per_hour
                 
-                # Revenue impact (assume $2 fare)
-                annual_revenue = ridership_impact['additional_riders'] * 260 * 2
+                # Revenue impact
+                annual_revenue = ridership_impact['additional_riders'] * params['operating_days_per_year'] * params['fare_per_trip']
                 
                 cost_impact = {
                     'annual_operating_cost': annual_cost,

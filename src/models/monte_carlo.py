@@ -6,6 +6,8 @@ import pandas as pd
 from typing import Dict, List, Callable, Tuple, Optional
 from dataclasses import dataclass
 
+from src.config.transit_params import get_cota_params
+
 
 @dataclass
 class MonteCarloResult:
@@ -176,7 +178,8 @@ class MonteCarloSimulator:
             rate = np.random.normal(ridership_rate_mean, ridership_rate_std)
             rate = max(0, rate)
             daily_riders = population_nearby * rate
-            return daily_riders * 260
+            params = get_cota_params()
+            return daily_riders * params['operating_days_per_year']
         
         return self.simulate_roi(
             annual_riders=annual_riders,
@@ -228,8 +231,9 @@ class MonteCarloSimulator:
             additional_vehicles = vehicles_proposed - vehicles_current
             
             additional_hours = additional_vehicles * service_hours_per_day
-            annual_cost = additional_hours * 260 * vehicle_cost_per_hour
-            annual_revenue = additional_riders * 260 * fare
+            params = get_cota_params()
+            annual_cost = additional_hours * params['operating_days_per_year'] * vehicle_cost_per_hour
+            annual_revenue = additional_riders * params['operating_days_per_year'] * fare
             
             return annual_revenue - annual_cost
         
@@ -246,6 +250,69 @@ class MonteCarloSimulator:
                 95: np.percentile(benefits, 95)
             },
             confidence_interval=(np.percentile(benefits, 2.5), np.percentile(benefits, 97.5)),
+            n_simulations=self.n_simulations
+        )
+    
+    def simulate_stop_proposal(
+        self,
+        population_nearby: int,
+        ridership_rate_mean: Optional[float] = None,
+        ridership_rate_std: float = 0.003,
+        cost_per_stop: Optional[float] = None,
+        fare_per_trip: Optional[float] = None,
+        operating_days_per_year: Optional[int] = None
+    ) -> MonteCarloResult:
+        """
+        Simulate ROI for a stop proposal with uncertainty.
+        
+        Args:
+            population_nearby: Population within walk distance
+            ridership_rate_mean: Mean daily ridership rate (fraction of population). Defaults to config value.
+            ridership_rate_std: Std dev of ridership rate
+            cost_per_stop: Implementation cost. Defaults to config value.
+            fare_per_trip: Revenue per trip. Defaults to config value.
+            operating_days_per_year: Days of service per year. Defaults to config value.
+            
+        Returns:
+            MonteCarloResult with ROI statistics
+        """
+        params = get_cota_params()
+        
+        if ridership_rate_mean is None:
+            ridership_rate_mean = params['ridership_rate']
+        if cost_per_stop is None:
+            cost_per_stop = params['cost_per_stop']
+        if fare_per_trip is None:
+            fare_per_trip = params['fare_per_trip']
+        if operating_days_per_year is None:
+            operating_days_per_year = params['operating_days_per_year']
+        
+        roi_samples = []
+        
+        for _ in range(self.n_simulations):
+            ridership_rate = np.random.normal(ridership_rate_mean, ridership_rate_std)
+            ridership_rate = max(0, ridership_rate)
+            
+            daily_ridership = population_nearby * ridership_rate
+            annual_revenue = daily_ridership * fare_per_trip * operating_days_per_year
+            annual_cost = cost_per_stop * params['maintenance_cost_pct']
+            
+            if cost_per_stop > 0:
+                roi = ((annual_revenue - annual_cost) / cost_per_stop) * 100
+                roi_samples.append(roi)
+        
+        roi_samples = np.array(roi_samples)
+        
+        percentiles = {
+            p: np.percentile(roi_samples, p)
+            for p in [5, 25, 50, 75, 95]
+        }
+        
+        return MonteCarloResult(
+            mean=np.mean(roi_samples),
+            std=np.std(roi_samples),
+            percentiles=percentiles,
+            confidence_interval=tuple(np.percentile(roi_samples, [2.5, 97.5])),
             n_simulations=self.n_simulations
         )
 
