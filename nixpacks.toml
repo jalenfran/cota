@@ -1,0 +1,9 @@
+[phases.setup]
+nixPkgs = ["python311"]
+
+[phases.install]
+cmds = ["pip install -q -r requirements-collector.txt"]
+
+[start]
+cmd = "python scripts/simple_collector.py 2"
+
