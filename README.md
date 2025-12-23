@@ -30,8 +30,15 @@
 ## Quick Start
 
 ```bash
-# Install
+# Install Python dependencies
 pip install -r requirements.txt
+
+# Install CBC solver (required for MIP optimization)
+# macOS:
+brew install cbc
+
+# Linux:
+# sudo apt-get install coinor-cbc
 
 # Generate professional reports
 jupyter notebook notebooks/02_professional_recommendations.ipynb
@@ -43,12 +50,19 @@ jupyter notebook notebooks/02_professional_recommendations.ipynb
 
 ## Data Collection
 
-For continuous real-time data collection, deploy to Railway:
+For continuous real-time data collection:
 
-1. Push code to GitHub
-2. Connect repo to Railway.app
-3. Railway auto-detects and runs `Procfile`
-4. Data collected every 2 minutes to `data/realtime_history/`
+```bash
+# Run locally
+python scripts/simple_collector.py
+
+# Or with custom intervals
+python scripts/simple_collector.py 2 15  # 2 min snapshots, 15 min alerts
+```
+
+Data collected to `data/realtime_history/`:
+- Vehicles & delays: Every 2 minutes (configurable)
+- Alerts: Every 15 minutes (alerts change infrequently)
 
 ## Key Capabilities
 
