@@ -1,0 +1,70 @@
+# COTA Transit Analysis Project
+
+## Project Overview
+Professional quantitative analysis of Columbus COTA bus system. Generates actionable recommendations with backtested validation for transit officials.
+
+## Codebase Structure
+
+```
+src/
+  loaders/     - Data loading (GTFS static, realtime protobuf, census)
+  analysis/    - Metrics and analytics (route efficiency, delays)
+  models/      - ML models and optimization (stop placement, scheduling)
+  reports/     - Report generation (PDF, Excel)
+  viz/         - Professional visualizations
+notebooks/     - Exploration and results
+data/          - Raw data (GTFS feeds, cached census downloads)
+output/        - Generated reports and artifacts
+```
+
+## Key Classes
+
+- `GTFSLoader`: Loads GTFS static feed (routes, stops, trips, stop_times)
+- `GTFSRealtimeLoader`: Loads live or cached GTFS-RT protobuf feeds
+- `CensusLoader`: Downloads and caches ACS population data for Franklin County
+- `RouteMetrics`: Calculates route efficiency metrics (directness, stop density)
+- `StopPlacementOptimizer`: Optimizes new stop locations using integer programming
+- `ScheduleOptimizer`: Optimizes headways and schedules
+- `Backtester`: Validates proposals with statistical testing
+- `ReportGenerator`: Creates executive PDF summaries and Excel workbooks
+
+## Data Sources
+
+- **GTFS Static**: 42 routes, 2,986 stops, 364K stop_times (Sep 2025 - Jan 2026)
+- **GTFS-RT**: Live feeds from COTA servers (VehiclePositions, TripUpdates, Alerts)
+- **Census**: ACS 5-year estimates (2022) for Franklin County block groups
+
+## Code Standards
+
+- No emojis in code or comments
+- Minimal comments - code should be self-explanatory
+- Type hints for function signatures
+- No excessive fallbacks - trust data structure once validated
+- Professional, production-ready code structure
+- Use vectorized operations (pandas/numpy) for performance
+
+## Data Loading Patterns
+
+- GTFS data structure is trusted - no repeated validation
+- Census data auto-downloads and caches on first use
+- Realtime feeds default to live API, can use cached .pb files
+- All data loaders use project root auto-detection
+
+## Key Assumptions
+
+- GTFS structure is clean and standard format
+- Complete linkages (route_id → trip_id → stop_times)
+- Geographic data present (lat/lon for stops, shapes)
+- Time data parseable (HH:MM:SS format)
+
+## Output Files
+
+- Reports generated in `output/reports/`
+- CSV snapshots in `output/`
+- All output files ignored by git
+
+## Dependencies
+
+Core: pandas, numpy, geopandas, matplotlib, seaborn
+Realtime: gtfs-realtime-bindings, requests
+Optional: censusdata, scipy, scikit-learn

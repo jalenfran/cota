@@ -24,6 +24,7 @@ htmlcov/
 # Data files
 data/*.pb
 data/census/
+data/realtime_history/
 data/*.zip
 output/
 *.csv

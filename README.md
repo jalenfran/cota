@@ -41,6 +41,15 @@ jupyter notebook notebooks/02_professional_recommendations.ipynb
 - `output/reports/executive_summary.pdf` - 2-page summary for decision-makers
 - `output/reports/recommendations.xlsx` - Detailed implementation plan
 
+## Data Collection
+
+For continuous real-time data collection, deploy to Railway:
+
+1. Push code to GitHub
+2. Connect repo to Railway.app
+3. Railway auto-detects and runs `Procfile`
+4. Data collected every 2 minutes to `data/realtime_history/`
+
 ## Key Capabilities
 
 ### Analysis & Optimization

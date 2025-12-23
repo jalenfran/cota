@@ -15,4 +15,5 @@ requests>=2.31.0
 geopandas>=0.14.0
 shapely>=2.0.0
 censusdata>=0.9.0
+pyarrow>=14.0.0
 
